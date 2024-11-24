@@ -44,6 +44,14 @@
     <td>Keluar</td>
     <td>✅</td>
   </tr>
+  <tr>
+    <td>Brute Force Login</td>
+    <td>✅</td>
+  </tr>
+  <tr>
+    <td>CSRF</td>
+    <td>✅</td>
+  </tr>
 </table>
 
 ---
