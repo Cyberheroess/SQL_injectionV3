@@ -58,9 +58,11 @@
 Instal library menggunakan perintah berikut:
 ```bash
 apt upgrade && apt update 
-pip install requests beautifulsoup4
+pip install requests
+pip install asyncio
 pip install aiohttp
 pip install validators
+pip install beautifulsoup4
 git clone https://github.com/Cyberheroess/SQL_injectionV3.git
 cd SQL_injectionV3
 python3 main.py
