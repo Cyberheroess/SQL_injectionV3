@@ -69,6 +69,7 @@ pip install validators
 pip install beautifulsoup4
 git clone https://github.com/Cyberheroess/SQL_injectionV3.git
 cd SQL_injectionV3
+pip install -r requirements.txt
 python3 main.py
 ```
 
