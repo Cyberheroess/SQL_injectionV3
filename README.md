@@ -62,6 +62,6 @@ cd SQL_injectionV3
 python3 main.py
 ```
 
-# peringatan 
+# ❗ peringatan ❗
 *script ini di buat untuk memudahkan pengujian keamanan web*
 
