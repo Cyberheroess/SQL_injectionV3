@@ -50,7 +50,7 @@ Tool ini digunakan untuk menguji keamanan aplikasi web, mendukung berbagai ekspl
 ---
 
 ## Prasyarat
-- Python 3.6 atau lebih baru.
+- Python 3.10 atau lebih baru.
 - Library Python:
   - `requests`
   - `BeautifulSoup4`
@@ -59,3 +59,5 @@ Tool ini digunakan untuk menguji keamanan aplikasi web, mendukung berbagai ekspl
 Instal library menggunakan perintah berikut:
 ```bash
 pip install requests beautifulsoup4
+```
+
