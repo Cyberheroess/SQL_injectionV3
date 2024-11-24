@@ -50,11 +50,7 @@
 
 ## Prasyarat
 - Python 3.10 atau lebih baru.
-- Library Python:
-  - `requests`
-  - `BeautifulSoup4`
-  - `threading`
-
+  
 Instal library menggunakan perintah berikut:
 ```bash
 apt upgrade && apt update 
