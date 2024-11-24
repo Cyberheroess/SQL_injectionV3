@@ -1,8 +1,7 @@
 # SQL_injectionV3
 
 ## Deskripsi
-Tool ini digunakan untuk menguji keamanan aplikasi web, mendukung berbagai eksploitasi seperti **SQL Injection**, **RCE**, **Command Injection**, **LFI**, dan lainnya. Pastikan Anda memiliki izin eksplisit untuk pengujian.
-
+tools ini adalah upgrade pada tools SQL injection sebelum nya
 ---
 
 ## Fitur
