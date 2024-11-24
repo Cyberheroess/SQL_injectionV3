@@ -5,8 +5,6 @@
 ---
 
 ## Fitur
-**Daftar Fitur dan Ketersediaan:**
-
 <table>
   <tr>
     <th>Menu</th>
