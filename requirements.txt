@@ -1,0 +1,6 @@
+requests
+aiohttp
+beautifulsoup4
+validators
+selenium
+webdriver-manager
