@@ -25,9 +25,11 @@ class Colors:
     WHITE = "\033[37m"
 
 class WebPenTestBot:
-    def __init__(self, base_url, proxy=None):
+    def __init__(self, base_url, proxy=None, login_url=None, credentials=None):
         self.base_url = base_url
         self.proxy = proxy
+        self.login_url = login_url
+        self.credentials = credentials
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
@@ -43,6 +45,9 @@ class WebPenTestBot:
 
         print(f"{Colors.MAGENTA}Disclaimer: Pastikan Anda memiliki izin eksplisit untuk melakukan pengujian ini.{Colors.RESET}")
         self.log_file = 'pentest_results.log'
+
+        if self.login_url and self.credentials:
+            self.login()
 
     def log(self, message, color=Colors.RESET):
         with open(self.log_file, 'a') as log:
@@ -143,6 +148,18 @@ class WebPenTestBot:
 
         return response.text
 
+    def login(self):
+        if self.login_url and self.credentials:
+            login_page = self.get_html(self.login_url)
+            if login_page:
+                response = self.session.post(self.base_url + self.login_url, data=self.credentials)
+                if 'Welcome' in response.text:
+                    self.log(f"{Colors.GREEN}[+] Login berhasil!{Colors.RESET}")
+                else:
+                    self.log(f"{Colors.RED}[x] Login gagal!{Colors.RESET}")
+            else:
+                self.log(f"{Colors.RED}[x] Tidak dapat mengakses halaman login.{Colors.RESET}")
+
     def start_exploit_threads(self, paths):
         threads = []
         results = []
@@ -183,5 +200,13 @@ if __name__ == "__main__":
         print(f"{Colors.RED}URL tidak valid. Pastikan URL dimulai dengan http:// atau https://{Colors.RESET}")
     else:
         proxy = input(f"{Colors.CYAN}Masukkan proxy (misal: http://127.0.0.1:8080) atau tekan Enter untuk melewati: {Colors.RESET}")
-        bot = WebPenTestBot(target_url, proxy if proxy else None)
+        login_url = input(f"{Colors.YELLOW}Masukkan URL login (misal: /login) atau tekan Enter untuk melewati: {Colors.RESET}")
+        if login_url:
+            username = input(f"{Colors.GREEN}Masukkan username untuk login: {Colors.RESET}")
+            password = input(f"{Colors.GREEN}Masukkan password untuk login: {Colors.RESET}")
+            credentials = {'username': username, 'password': password}
+        else:
+            credentials = None
+        
+        bot = WebPenTestBot(target_url, proxy if proxy else None, login_url, credentials)
         bot.analyze_site()
