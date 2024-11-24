@@ -13,11 +13,11 @@
     <th>Available</th>
   </tr>
   <tr>
-    <td>Denial of Service (DoS)</td>
+    <td>Autentikasi dan Login</td>
     <td>✅</td>
   </tr>
   <tr>
-    <td>Distributed Denial of Service (DDoS)</td>
+    <td>Pembuatan Header dan User-Agent Acak</td>
     <td>✅</td>
   </tr>
   <tr>
@@ -50,6 +50,30 @@
   </tr>
   <tr>
     <td>CSRF</td>
+    <td>✅</td>
+  </tr>
+  <tr>
+    <td>Obfuscation Payload</td>
+    <td>✅</td>
+  </tr>
+  <tr>
+    <td>Penggunaan Proxy</td>
+    <td>✅</td>
+  </tr>
+  <tr>
+    <td>Logging dan Monitoring</td>
+    <td>✅</td>
+  </tr>
+  <tr>
+    <td>Multithreading untuk Brute Force</td>
+    <td>✅</td>
+  </tr>
+  <tr>
+    <td>Pengujian pada Beberapa Path</td>
+    <td>✅</td>
+  </tr>
+  <tr>
+    <td>Dukungan Pengujian Asinkron</td>
     <td>✅</td>
   </tr>
 </table>
