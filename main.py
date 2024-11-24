@@ -261,7 +261,6 @@ class WebPenTestBot:
         self.run_selenium_test()
 
 if __name__ == "__main__":
-    # Ubah dengan URL target yang sesuai dan jika diperlukan, kredensial login
     bot = WebPenTestBot(base_url="http://target-website.com", 
                         proxy=None, 
                         login_url="http://target-website.com/login", 
